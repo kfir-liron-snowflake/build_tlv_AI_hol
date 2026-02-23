@@ -262,7 +262,7 @@ Once created, navigate to the agent in Snowsight and try these sample questions:
    - **Query Text column**: `INPUT_QUERY`
    - Enable **Tool Selection Accuracy** and set the expected tool invocation column to `GROUND_TRUTH_DATA`
 
-![Select metrics screen](images/select-metrics.png)
+![Select metrics screen](images/select-metrics-corrected.png)
 
 7. Click **Create Evaluation**
 
