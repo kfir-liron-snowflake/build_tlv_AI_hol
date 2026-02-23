@@ -229,18 +229,31 @@ Once created, navigate to the agent in Snowsight and try these sample questions:
 
 1. Navigate to your agent (`MARKETING_CAMPAIGNS_AGENT`) in Snowsight
 2. Click the **Evaluations** tab → **New Evaluation Run**
+
+![Evaluations tab showing existing runs](images/evaluation-runs.png)
+
 3. Name the run (e.g. `baseline_eval`) and optionally add a description → **Next**
 4. Select **Create New Dataset**
    - Input table: `MARKETING_CAMPAIGNS_DB.AGENTS.EVALS_TABLE`
    - New dataset name: `MARKETING_CAMPAIGNS_DB.AGENTS.QUICKSTART_EVALSET`
    - → **Next**
+
+![Select dataset screen](images/select-dataset.png)
+
 5. Column mapping:
    - **Query Text column**: `INPUT_QUERY`
    - Enable all available metrics
    - For **Tool Selection Accuracy**, **Tool Execution Accuracy**, and **Answer Correctness** → reference the `GROUND_TRUTH_DATA` column
+
+![Select metrics screen](images/select-metrics.png)
+
 6. Click **Create Evaluation**
 
+![Evaluation run in progress](images/run-in-progress.png)
+
 Results populate in approximately 3–5 minutes. Note your baseline scores before proceeding to optimization.
+
+![Tool Selection Accuracy record detail](images/tsa.png)
 
 ---
 
