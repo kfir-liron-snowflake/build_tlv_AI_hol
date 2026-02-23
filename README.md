@@ -30,8 +30,8 @@ By the end of this lab you will have:
    - [Section 8 — Create Report Generation Stored Procedure](#section-8--create-report-generation-stored-procedure)
    - [Section 9 — Test the Services](#section-9--test-the-services)
    - [Section 10 — Create the Cortex Agent](#section-10--create-the-cortex-agent)
-   - [Section 11 — Run the Baseline Evaluation](#section-11--run-the-baseline-evaluation-action-required-in-the-ui)
-   - [Section 12 — Optimize the Agent](#section-12--optimize-the-agent-action-required-in-the-ui)
+   - [Section 11 — Run the Baseline Evaluation](#section-11--run-the-baseline-evaluation-snowsight-ui)
+   - [Section 12 — Optimize the Agent](#section-12--optimize-the-agent-snowsight-ui)
    - [Section 13 — Conclusion](#section-13--conclusion)
 5. [Troubleshooting](#troubleshooting)
 6. [Cleanup](#cleanup)
@@ -115,24 +115,22 @@ The agent exposes three tools to end users:
 
 ## Lab Steps
 
+> **Sections 1–10** are executed entirely by running `SETUP.sql` in a Snowsight worksheet.
+> Open the file, paste the full contents into a new worksheet, and run each section top to bottom.
+>
+> **Sections 11–12** are performed in the Snowsight UI — no SQL required.
+
+---
+
 ### Section 1 — Database and Schema Creation
 
-Run as `ACCOUNTADMIN`. Creates the database, schema, and warehouse used throughout the lab.
-
-```sql
-USE ROLE ACCOUNTADMIN;
-
-CREATE DATABASE IF NOT EXISTS MARKETING_CAMPAIGNS_DB;
-CREATE OR REPLACE SCHEMA MARKETING_CAMPAIGNS_DB.AGENTS;
-USE SCHEMA MARKETING_CAMPAIGNS_DB.AGENTS;
-CREATE WAREHOUSE IF NOT EXISTS COMPUTE_WH WAREHOUSE_SIZE='SMALL';
-```
+Runs as `ACCOUNTADMIN`. Creates `MARKETING_CAMPAIGNS_DB`, the `AGENTS` schema, and a `COMPUTE_WH` warehouse (Small size) that are used throughout the lab.
 
 ---
 
 ### Section 2 — Role Configuration
 
-Creates a least-privilege role (`AGENT_EVAL_ROLE`) and grants it all permissions needed to create and run the lab objects: tables, stages, semantic views, search services, procedures, agents, and evaluation tasks.
+Creates a least-privilege role (`AGENT_EVAL_ROLE`) and grants it all permissions needed to build and run the lab objects: tables, stages, semantic views, search services, procedures, agents, and evaluation tasks. `AGENT_EVAL_ROLE` is also set as the **default role** for your user so it is active automatically on next login.
 
 Key grants include:
 - `SNOWFLAKE.CORTEX_USER` database role for Cortex API access
@@ -140,47 +138,17 @@ Key grants include:
 - `IMPERSONATE` on the current user so the evaluation task can execute agent calls on your behalf
 - `CREATE AGENT`, `CREATE SEMANTIC VIEW`, `CREATE CORTEX SEARCH SERVICE` on the schema
 
-```sql
-CREATE OR REPLACE ROLE AGENT_EVAL_ROLE;
-SET AGENT_EVAL_USER = CURRENT_USER();
-GRANT ROLE AGENT_EVAL_ROLE TO USER IDENTIFIER($AGENT_EVAL_USER);
--- ... (see SETUP.sql for full grant list)
-```
-
 ---
 
 ### Section 3 — GitHub Integration
 
-Creates a Snowflake Git Repository integration that clones the public Snowflake Labs repository. The CSV data files for all tables are loaded directly from this repository — no manual file upload required.
-
-```sql
-USE ROLE AGENT_EVAL_ROLE;
-
-CREATE API INTEGRATION IF NOT EXISTS GIT_API_INTEGRATION_AGENT_EVAL_QUICKSTART
-    API_PROVIDER = git_https_api
-    API_ALLOWED_PREFIXES = ('https://github.com/Snowflake-Labs/')
-    ENABLED = TRUE;
-
-CREATE OR REPLACE GIT REPOSITORY CORTEX_AGENT_QUICKSTART_REPO
-    API_INTEGRATION = GIT_API_INTEGRATION_AGENT_EVAL_QUICKSTART
-    ORIGIN = 'https://github.com/Snowflake-Labs/sfguide-getting-started-with-cortex-agent-evaluations.git';
-
-ALTER GIT REPOSITORY CORTEX_AGENT_QUICKSTART_REPO FETCH;
-```
-
-Verify the repository is accessible:
-```sql
-SHOW GIT BRANCHES IN CORTEX_AGENT_QUICKSTART_REPO;
-LS @CORTEX_AGENT_QUICKSTART_REPO/branches/main/data;
-```
+Creates a Snowflake Git Repository integration pointing to the public Snowflake Labs repository. All CSV data files are loaded directly from this repository — no manual file upload required. After cloning, the script verifies the repository is accessible by listing the `/data` folder.
 
 ---
 
 ### Section 4 — Create and Populate Tables
 
 Creates a CSV file format, then creates and loads four tables by reading CSV files directly from the cloned repository stage.
-
-#### Tables
 
 | Table | Records | Description |
 |---|---|---|
@@ -190,43 +158,13 @@ Creates a CSV file format, then creates and loads four tables by reading CSV fil
 | `CAMPAIGN_FEEDBACK` | 23 | Customer feedback — satisfaction scores, comments, recommendations |
 | `EVALS_TABLE` | varies | Evaluation dataset — sample queries with expected tool selections |
 
-Each table is loaded with a `COPY INTO … FROM @git_stage` pattern:
-
-```sql
-CREATE OR REPLACE FILE FORMAT AGENT_EVAL_QUICKSTART_CSV_FORMAT
-  TYPE = 'CSV'
-  FIELD_DELIMITER = ','
-  SKIP_HEADER = 1
-  FIELD_OPTIONALLY_ENCLOSED_BY = '"'
-  COMPRESSION = 'AUTO';
-
-INSERT INTO CAMPAIGNS (campaign_id, campaign_name, ...)
-SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
-FROM @CORTEX_AGENT_QUICKSTART_REPO/branches/main/data/CAMPAIGNS.csv
-  (FILE_FORMAT=>AGENT_EVAL_QUICKSTART_CSV_FORMAT);
-```
-
-The `EVALS_TABLE` is post-processed to parse the `EXPECTED_TOOLS` column from a JSON string into a `VARIANT` column:
-
-```sql
-CREATE OR REPLACE TABLE EVALS_TABLE
-AS SELECT INPUT_QUERY, PARSE_JSON(EXPECTED_TOOLS) AS GROUND_TRUTH_DATA
-FROM EVALS_TABLE;
-```
+The `EVALS_TABLE` is post-processed to parse the `EXPECTED_TOOLS` column from a JSON string into a `VARIANT` column used as ground truth during evaluations.
 
 ---
 
 ### Section 5 — Validate Data
 
-Quick sanity-check queries to confirm all tables loaded correctly before proceeding.
-
-```sql
-SELECT * FROM CAMPAIGNS;
-SELECT * FROM CAMPAIGN_CONTENT;
-SELECT * FROM CAMPAIGN_FEEDBACK;
-SELECT * FROM CAMPAIGN_PERFORMANCE;
-SELECT * FROM EVALS_TABLE;
-```
+Runs a `SELECT *` on each table to confirm all rows loaded correctly before proceeding.
 
 ---
 
@@ -238,51 +176,11 @@ Creates `MARKETING_PERFORMANCE_ANALYST`, a **Semantic View** that Cortex Analyst
 - **Metrics** — pre-aggregated measures (total revenue, total impressions, average ROI, etc.)
 - **Relationships** — join between `CAMPAIGNS` and `CAMPAIGN_PERFORMANCE` on `campaign_id`
 
-```sql
-CREATE OR REPLACE SEMANTIC VIEW MARKETING_PERFORMANCE_ANALYST
-  TABLES (
-    campaigns AS CAMPAIGNS PRIMARY KEY (campaign_id),
-    performance AS CAMPAIGN_PERFORMANCE PRIMARY KEY (performance_id)
-  )
-  RELATIONSHIPS (
-    performance(campaign_id) REFERENCES campaigns(campaign_id)
-  )
-  DIMENSIONS ( ... )
-  METRICS (
-    PUBLIC performance.total_revenue AS SUM(revenue_generated),
-    PUBLIC performance.avg_roi       AS AVG(roi_percentage),
-    -- ...
-  );
-```
-
-Verify creation:
-```sql
-SHOW SEMANTIC VIEWS LIKE 'MARKETING_PERFORMANCE_ANALYST';
-```
-
 ---
 
 ### Section 7 — Create Cortex Search Service
 
-Creates `MARKETING_CAMPAIGNS_SEARCH`, a **Cortex Search Service** that indexes all unstructured text from `CAMPAIGN_CONTENT` and `CAMPAIGN_FEEDBACK`. A `UNION ALL` query combines both sources into a single `combined_text` column for semantic search.
-
-```sql
-CREATE OR REPLACE CORTEX SEARCH SERVICE MARKETING_CAMPAIGNS_SEARCH
-  ON combined_text
-  ATTRIBUTES campaign_name, campaign_type, channel, content_type
-  WAREHOUSE = COMPUTE_WH
-  TARGET_LAG = '1 hour'
-  AS (
-    SELECT ... combined_text FROM CAMPAIGNS JOIN CAMPAIGN_CONTENT ...
-    UNION ALL
-    SELECT ... combined_text FROM CAMPAIGNS JOIN CAMPAIGN_FEEDBACK ...
-  );
-```
-
-Verify creation:
-```sql
-SHOW CORTEX SEARCH SERVICES LIKE 'MARKETING_CAMPAIGNS_SEARCH';
-```
+Creates `MARKETING_CAMPAIGNS_SEARCH`, a **Cortex Search Service** that indexes all unstructured text from `CAMPAIGN_CONTENT` and `CAMPAIGN_FEEDBACK`. A `UNION ALL` query combines both sources into a single `combined_text` column for semantic search, refreshed on a 1-hour lag.
 
 ---
 
@@ -297,95 +195,37 @@ Creates `GENERATE_CAMPAIGN_REPORT_HTML(campaign_id NUMBER)`, a stored procedure 
 
 The procedure is registered as the `generate_campaign_report` tool in the agent so users can trigger it via natural language (e.g. _"Generate a report for the Spring Fashion campaign"_).
 
-```sql
-CREATE OR REPLACE STAGE CAMPAIGN_REPORTS
-  DIRECTORY = (ENABLE = TRUE);
-
-CREATE OR REPLACE PROCEDURE GENERATE_CAMPAIGN_REPORT_HTML(campaign_id NUMBER)
-RETURNS VARCHAR
-LANGUAGE SQL
-EXECUTE AS OWNER
-AS $$ ... $$;
-```
-
-Verify creation:
-```sql
-SHOW PROCEDURES LIKE 'GENERATE_CAMPAIGN_REPORT_HTML';
-```
-
 ---
 
 ### Section 9 — Test the Services
 
-Run these checks before creating the agent to confirm each service works independently.
-
-**Semantic view (text-to-SQL):**
-```sql
-SELECT campaign_type, campaign_count, total_budget, total_revenue, avg_roi
-FROM SEMANTIC_VIEW(
-    MARKETING_PERFORMANCE_ANALYST
-    DIMENSIONS campaign_type
-    METRICS campaign_count, total_budget, total_revenue, avg_roi
-);
-```
-
-**Cortex Search:**
-```sql
-SELECT PARSE_JSON(
-    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        'MARKETING_CAMPAIGNS_SEARCH',
-        '{"query": "email campaigns", "columns": ["campaign_name", "campaign_type", "combined_text"], "limit": 3}'
-    )
-) AS search_results;
-```
-
-**Stored procedure:**
-```sql
-CALL GENERATE_CAMPAIGN_REPORT_HTML(1);
-LS @CAMPAIGN_REPORTS;
-```
+Runs validation queries against each service independently before wiring them into the agent:
+- A `SEMANTIC_VIEW()` query to test Cortex Analyst text-to-SQL
+- A `SEARCH_PREVIEW()` call to test the Cortex Search service
+- A `CALL GENERATE_CAMPAIGN_REPORT_HTML(1)` to test the stored procedure
 
 ---
 
 ### Section 10 — Create the Cortex Agent
 
-Creates `MARKETING_CAMPAIGNS_AGENT` and wires all three tools to their backing services.
+Creates `MARKETING_CAMPAIGNS_AGENT` and wires all three tools to their backing services:
 
-```sql
-CREATE OR REPLACE AGENT MARKETING_CAMPAIGNS_AGENT
-WITH PROFILE='{ "display_name": "MARKETING_CAMPAIGNS_AGENT" }'
-FROM SPECIFICATION $$
-{
-  "models": {"orchestration": "auto"},
-  "tools": [
-    { "tool_spec": { "type": "cortex_analyst_text_to_sql", "name": "query_performance_metrics", ... } },
-    { "tool_spec": { "type": "cortex_search",              "name": "search_campaign_content",   ... } },
-    { "tool_spec": { "type": "generic",                    "name": "generate_campaign_report",   ... } }
-  ],
-  "tool_resources": {
-    "query_performance_metrics": { "semantic_view": "MARKETING_CAMPAIGNS_DB.AGENTS.MARKETING_PERFORMANCE_ANALYST" },
-    "search_campaign_content":   { "search_service": "MARKETING_CAMPAIGNS_DB.AGENTS.MARKETING_CAMPAIGNS_SEARCH"  },
-    "generate_campaign_report":  { "type": "procedure", "identifier": "MARKETING_CAMPAIGNS_DB.AGENTS.GENERATE_CAMPAIGN_REPORT_HTML" }
-  }
-}
-$$;
-```
+| Tool | Backing service |
+|---|---|
+| `query_performance_metrics` | `MARKETING_PERFORMANCE_ANALYST` semantic view |
+| `search_campaign_content` | `MARKETING_CAMPAIGNS_SEARCH` Cortex Search service |
+| `generate_campaign_report` | `GENERATE_CAMPAIGN_REPORT_HTML` stored procedure |
 
-Verify creation:
-```sql
-DESCRIBE AGENT MARKETING_CAMPAIGNS_AGENT;
-```
-
-Try the agent with these sample questions:
+Once created, navigate to the agent in Snowsight and try these sample questions:
 - _"What campaigns have the highest ROI?"_
 - _"What feedback did customers give about email campaigns?"_
 - _"Generate a report for campaign ID 1"_
 
 ---
 
-### Section 11 — Run the Baseline Evaluation _(Action Required in the UI)_
+### Section 11 — Run the Baseline Evaluation _(Snowsight UI)_
 
-> **This step is performed in the Snowsight UI, not in a SQL worksheet.**
+> **This section is performed entirely in the Snowsight UI — no SQL required.**
 
 1. Navigate to your agent (`MARKETING_CAMPAIGNS_AGENT`) in Snowsight
 2. Click the **Evaluations** tab → **New Evaluation Run**
@@ -404,11 +244,11 @@ Results populate in approximately 3–5 minutes. Note your baseline scores befor
 
 ---
 
-### Section 12 — Optimize the Agent _(Action Required in the UI)_
+### Section 12 — Optimize the Agent _(Snowsight UI)_
 
-> **This step is performed in the Snowsight UI, not in a SQL worksheet.**
+> **This section is performed entirely in the Snowsight UI — no SQL required.**
 
-The `SETUP.sql` file contains two blocks of optimized instructions. Copy them into the agent UI to improve routing consistency and response quality.
+`SETUP.sql` contains two blocks of optimized instructions (Section 12). Copy them into the agent UI to improve routing consistency and response quality.
 
 #### Step 1 — Add Orchestration Instructions
 
