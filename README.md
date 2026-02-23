@@ -244,8 +244,7 @@ Once created, navigate to the agent in Snowsight and try these sample questions:
 
 5. Column mapping:
    - **Query Text column**: `INPUT_QUERY`
-   - Enable all available metrics
-   - For **Tool Selection Accuracy**, **Tool Execution Accuracy**, and **Answer Correctness** → reference the `GROUND_TRUTH_DATA` column
+   - Enable **Tool Selection Accuracy** and set the expected tool invocation column to `GROUND_TRUTH_DATA`
 
 ![Select metrics screen](images/select-metrics.png)
 
