@@ -287,6 +287,8 @@ The instructions enforce consistent formatting rules: leading direct answer, tab
 
 Repeat **Section 11** with a new run name (e.g. `optimized_eval`) and select **Existing Dataset** to reuse the dataset created earlier. Compare the metrics side-by-side with your baseline run to quantify the improvement.
 
+![Baseline vs optimized evaluation results comparison](images/comparison-results.png)
+
 ---
 
 ### Section 13 — Conclusion
