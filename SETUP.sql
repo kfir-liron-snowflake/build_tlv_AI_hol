@@ -262,7 +262,7 @@ CREATE OR REPLACE SEMANTIC VIEW MARKETING_PERFORMANCE_ANALYST
     PUBLIC campaigns.status AS status,
     PUBLIC campaigns.start_date AS start_date,
     PUBLIC campaigns.end_date AS end_date,
-    PUBLIC campaigns.created_by AS created_by,
+    ---PUBLIC campaigns.created_by AS created_by,
     PUBLIC performance.date AS date
   )
   METRICS (
