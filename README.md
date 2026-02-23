@@ -19,7 +19,7 @@ By the end of this lab you will have:
    - [Step 2 — Register for the Agent Evaluations Feature](#step-2--register-for-the-agent-evaluations-feature)
 2. [Prerequisites](#prerequisites)
 3. [Architecture Overview](#architecture-overview)
-4. [Lab Steps](#lab-steps)
+4. [Part 1 — SQL Setup (Sections 1–10)](#part-1--sql-setup-sections-110)
    - [Section 1 — Database and Schema Creation](#section-1--database-and-schema-creation)
    - [Section 2 — Role Configuration](#section-2--role-configuration)
    - [Section 3 — GitHub Integration](#section-3--github-integration)
@@ -30,12 +30,13 @@ By the end of this lab you will have:
    - [Section 8 — Create Report Generation Stored Procedure](#section-8--create-report-generation-stored-procedure)
    - [Section 9 — Test the Services](#section-9--test-the-services)
    - [Section 10 — Create the Cortex Agent](#section-10--create-the-cortex-agent)
+5. [Part 2 — UI Steps (Sections 11–12)](#part-2--ui-steps-sections-1112)
    - [Section 11 — Run the Baseline Evaluation](#section-11--run-the-baseline-evaluation-snowsight-ui)
    - [Section 12 — Optimize the Agent](#section-12--optimize-the-agent-snowsight-ui)
    - [Section 13 — Conclusion](#section-13--conclusion)
-5. [Troubleshooting](#troubleshooting)
-6. [Cleanup](#cleanup)
-7. [Resources](#resources)
+6. [Troubleshooting](#troubleshooting)
+7. [Cleanup](#cleanup)
+8. [Resources](#resources)
 
 ---
 
@@ -113,12 +114,9 @@ The agent exposes three tools to end users:
 
 ---
 
-## Lab Steps
+## Part 1 — SQL Setup (Sections 1–10)
 
-> **Sections 1–10** are executed entirely by running `SETUP.sql` in a Snowsight worksheet.
-> Open the file, paste the full contents into a new worksheet, and run each section top to bottom.
->
-> **Sections 11–12** are performed in the Snowsight UI — no SQL required.
+> Open `SETUP.sql`, paste the full contents into a new Snowsight worksheet, and run each section top to bottom.
 
 ---
 
@@ -223,9 +221,13 @@ Once created, navigate to the agent in Snowsight and try these sample questions:
 
 ---
 
-### Section 11 — Run the Baseline Evaluation _(Snowsight UI)_
+## Part 2 — UI Steps (Sections 11–12)
 
-> **This section is performed entirely in the Snowsight UI — no SQL required.**
+> These sections are performed entirely in the Snowsight UI — no SQL required.
+
+---
+
+### Section 11 — Run the Baseline Evaluation _(Snowsight UI)_
 
 1. Navigate to your agent (`MARKETING_CAMPAIGNS_AGENT`) in Snowsight
 2. Click the **Evaluations** tab → **New Evaluation Run**
@@ -259,8 +261,6 @@ Results populate in approximately 3–5 minutes. Note your baseline scores befor
 
 ### Section 12 — Optimize the Agent _(Snowsight UI)_
 
-> **This section is performed entirely in the Snowsight UI — no SQL required.**
-
 `SETUP.sql` contains two blocks of optimized instructions (Section 12). Copy them into the agent UI to improve routing consistency and response quality.
 
 #### Step 1 — Add Orchestration Instructions
@@ -285,7 +285,7 @@ The instructions enforce consistent formatting rules: leading direct answer, tab
 
 #### Step 3 — Re-run the Evaluation
 
-Repeat **Section 11** with a new run name (e.g. `optimized_eval`) using the same dataset (`QUICKSTART_EVALSET`). Compare the metrics side-by-side with your baseline run to quantify the improvement.
+Repeat **Section 11** with a new run name (e.g. `optimized_eval`) and select **Existing Dataset** to reuse the dataset created earlier. Compare the metrics side-by-side with your baseline run to quantify the improvement.
 
 ---
 
@@ -297,7 +297,7 @@ Repeat **Section 11** with a new run name (e.g. `optimized_eval`) using the same
 
 | Symptom | Resolution |
 |---|---|
-| Error mentioning the feature is unavailable or not enabled | Log out of Snowsight and log back in. The feature flag is applied at session start, so a fresh login is required after access is granted. |
+| You get an error running the script, or the Evaluations tab is not visible on your agent | Log out of Snowsight and log back in. The feature flag is applied at session start, so a fresh login is required after access is granted. |
 | Evaluation metrics do not improve after adding optimization instructions | This is expected and not a problem. Prompt sensitivity varies by query; partial improvement or no change on some metrics is a normal outcome. Focus on overall trends across the full eval set. |
 | Red triangle alert icon on an evaluation run | This is expected on trial accounts and reflects a known limitation of the trial environment. It does not affect the evaluation results or metrics — proceed normally. |
 
