@@ -268,6 +268,8 @@ Results populate in approximately 3–5 minutes. Note your baseline scores befor
 1. Open the agent in Snowsight → **Edit** → **Orchestration** tab
 2. Paste the **Orchestration Instructions** block from `SETUP.sql` (Section 12, first `$$` block)
 
+![Agent orchestration instructions](images/Agent%20instructions.png)
+
 The instructions define four strict routing rules:
 - **Rule 1** — Use `query_performance_metrics` for all numerical/quantitative queries
 - **Rule 3** — Use `search_campaign_content` for all qualitative/text queries  
